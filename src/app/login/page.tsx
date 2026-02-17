@@ -3,7 +3,7 @@
 import { getSupabaseClient } from "@/lib/supabase/client";
 
 export default function LoginPage() {
-  const supabase = getSupabaseClient();
+  const supabase = getSupabaseClient()!;
   
   const signInWithGoogle = async () => {
     const siteUrl =

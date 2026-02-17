@@ -6,7 +6,7 @@ import { getSupabaseClient } from "@/lib/supabase/client";
 
 export default function DashboardPage() {
   const router = useRouter();
-  const supabase = getSupabaseClient();
+  const supabase = getSupabaseClient()!;
 
   const [email, setEmail] = useState<string | null>(null);
   const [bookmarks, setBookmarks] = useState<any[]>([]);
