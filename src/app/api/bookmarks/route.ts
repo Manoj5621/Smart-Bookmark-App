@@ -12,46 +12,67 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "Missing config" }, { status: 500 });
   }
 
-  const supabase = createClient(supabaseUrl, supabaseAnonKey);
-
-  // Get user from cookie
-  const cookieHeader = request.headers.get("cookie") || "";
-  
-  const supabaseAuthToken = cookieHeader
-    .split("; ")
-    .find((c) => c.startsWith("sb-access-token="))
-    ?.split("=")[1];
-
-  if (!supabaseAuthToken) {
-    return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
-  }
-
-  supabase.auth.setSession({
-    access_token: supabaseAuthToken,
-    refresh_token: cookieHeader
-      .split("; ")
-      .find((c) => c.startsWith("sb-refresh-token="))
-      ?.split("=")[1] || "",
+  const supabase = createClient(supabaseUrl, supabaseAnonKey, {
+    auth: {
+      persistSession: false,
+      autoRefreshToken: false,
+    }
   });
 
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  // Try to get token from Authorization header first, then cookies
+  const authHeader = request.headers.get("authorization");
+  let accessToken = authHeader?.replace("Bearer ", "");
+  let refreshToken = "";
 
-  if (!user) {
-    return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
+  // If no Bearer token, try cookies
+  if (!accessToken) {
+    const cookieHeader = request.headers.get("cookie") || "";
+    accessToken = cookieHeader
+      .split("; ")
+      .find((c) => c.startsWith("sb-access-token="))
+      ?.split("=")[1];
+    refreshToken = cookieHeader
+      .split("; ")
+      .find((c) => c.startsWith("sb-refresh-token="))
+      ?.split("=")[1] || "";
+  }
+
+  if (!accessToken) {
+    return NextResponse.json({ error: "Not authenticated - no token provided" }, { status: 401 });
+  }
+
+  // Set the session
+  if (refreshToken) {
+    await supabase.auth.setSession({
+      access_token: accessToken,
+      refresh_token: refreshToken,
+    });
+  }
+
+  // Get the current user
+  const { data: { user }, error: userError } = await supabase.auth.getUser(accessToken);
+
+  if (userError || !user) {
+    return NextResponse.json({ error: "Invalid token or user not found" }, { status: 401 });
   }
 
   const { title, url } = await request.json();
 
+  // Insert bookmark with user_id
   const { data, error } = await supabase
     .from("bookmarks")
-    .insert([{ title, url, user_id: user.id }])
-    .select();
+    .insert([{ 
+      title, 
+      url, 
+      user_id: user.id 
+    }])
+    .select()
+    .single();
 
   if (error) {
+    console.error('Supabase error:', error);
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
 
-  return NextResponse.json(data[0]);
+  return NextResponse.json(data);
 }

@@ -1,85 +1,194 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
+import { supabase } from "@/lib/supabase/client";
 
-interface Bookmark {
-  id: number;
+type Bookmark = {
+  id: string;
   title: string;
   url: string;
   created_at: string;
-}
+};
 
 export default function DashboardContent() {
   const router = useRouter();
+
   const [email, setEmail] = useState<string | null>(null);
   const [bookmarks, setBookmarks] = useState<Bookmark[]>([]);
   const [loading, setLoading] = useState(true);
+  const [title, setTitle] = useState("");
+  const [url, setUrl] = useState("");
 
+  // 🔐 AUTH CHECK + LOAD DATA
   useEffect(() => {
-    // Check auth status via API route
-    async function checkAuth() {
-      try {
-        const response = await fetch('/api/auth/me');
-        if (!response.ok) {
-          router.push('/login');
-          return;
-        }
-        
-        const data = await response.json();
-        setEmail(data.user?.email || null);
-        setBookmarks(data.bookmarks || []);
-      } catch (error) {
-        console.error('Auth check failed:', error);
-        router.push('/login');
-      } finally {
-        setLoading(false);
-      }
-    }
-    
-    checkAuth();
-  }, [router]);
+    const init = async () => {
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
 
+      if (!user) {
+        router.push("/login");
+        return;
+      }
+
+      setEmail(user.email ?? null);
+
+      const { data } = await supabase
+        .from("bookmarks")
+        .select("*")
+        .order("created_at", { ascending: false });
+
+      setBookmarks(data ?? []);
+      setLoading(false);
+    };
+
+    init();
+  }, [router, supabase]);
+
+  // ➕ ADD BOOKMARK
+  const addBookmark = async (e: React.FormEvent) => {
+    e.preventDefault();
+
+    if (!title || !url) return;
+
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+
+    if (!user) return;
+
+    const { data, error } = await supabase
+      .from("bookmarks")
+      .insert({
+        title,
+        url,
+        user_id: user.id,
+      })
+      .select()
+      .single();
+
+    if (!error && data) {
+      setBookmarks((prev) => [data, ...prev]);
+      setTitle("");
+      setUrl("");
+    }
+  };
+
+  // ❌ DELETE BOOKMARK
+  const deleteBookmark = async (id: string) => {
+    await supabase.from("bookmarks").delete().eq("id", id);
+    setBookmarks((prev) => prev.filter((b) => b.id !== id));
+  };
+
+  // 🚪 LOGOUT
+  const logout = async () => {
+    await supabase.auth.signOut();
+    router.push("/login");
+  };
+
+  // ⏳ LOADING
   if (loading) {
-    return <p>Loading...</p>;
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <p className="text-black">Loading dashboard...</p>
+      </div>
+    );
   }
 
   return (
-    <div className="p-6">
-      <h1 className="text-2xl font-bold mb-4">Welcome, {email}</h1>
-      
-      <div className="mb-6">
-        <h2 className="text-xl font-semibold mb-2">Add Bookmark</h2>
-        <form onSubmit={async (e) => {
-          e.preventDefault();
-          const form = e.target as HTMLFormElement;
-          const title = (form.elements.namedItem('title') as HTMLInputElement).value;
-          const url = (form.elements.namedItem('url') as HTMLInputElement).value;
-          
-          await fetch('/api/bookmarks', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ title, url }),
-          });
-          
-          form.reset();
-        }} className="flex gap-2">
-          <input name="title" placeholder="Title" required className="border p-2 rounded" />
-          <input name="url" placeholder="URL" type="url" required className="border p-2 rounded" />
-          <button type="submit" className="bg-blue-500 text-white px-4 py-2 rounded">Add</button>
-        </form>
-      </div>
+    <div className="min-h-screen bg-gradient-to-br from-yellow-100 via-orange-50 to-red-100">
+      {/* HEADER */}
+      <header className="bg-white shadow">
+        <div className="max-w-7xl mx-auto px-6 py-4 flex justify-between items-center">
+          <h1 className="text-2xl font-bold text-black">🔖 Smart Bookmark</h1>
+          <div className="flex items-center gap-4">
+            <span className="text-black">{email}</span>
+            <button
+              onClick={logout}
+              className="bg-red-500 hover:bg-red-600 text-white px-4 py-2 rounded-lg"
+            >
+              Logout
+            </button>
+          </div>
+        </div>
+      </header>
 
-      <h2 className="text-xl font-semibold mb-2">Your Bookmarks</h2>
-      <ul>
-        {bookmarks.map((b: Bookmark) => (
-          <li key={b.id} className="border-b py-2">
-            <a href={b.url} target="_blank" rel="noopener noreferrer" className="text-blue-500 hover:underline">
-              {b.title}
-            </a>
-          </li>
-        ))}
-      </ul>
+      {/* MAIN */}
+      <main className="max-w-7xl mx-auto px-6 py-8 space-y-8">
+        {/* ADD BOOKMARK */}
+        <div className="bg-white p-6 rounded-xl shadow">
+          <h2 className="text-xl font-semibold mb-4 text-black">➕ Add Bookmark</h2>
+
+          <form onSubmit={addBookmark} className="flex flex-col md:flex-row gap-4">
+            <input
+              type="text"
+              placeholder="Bookmark title"
+              value={title}
+              onChange={(e) => setTitle(e.target.value)}
+              required
+              className="flex-1 border rounded-lg px-4 py-2 text-black"
+            />
+
+            <input
+              type="url"
+              placeholder="https://example.com"
+              value={url}
+              onChange={(e) => setUrl(e.target.value)}
+              required
+              className="flex-1 border rounded-lg px-4 py-2 text-black"
+            />
+
+            <button
+              type="submit"
+              className="bg-red-500 hover:bg-red-600 text-white px-6 py-2 rounded-lg"
+            >
+              Add
+            </button>
+          </form>
+        </div>
+
+        {/* BOOKMARK LIST */}
+        <div className="bg-white p-6 rounded-xl shadow">
+          <h2 className="text-xl font-semibold mb-4 text-black">
+            📚 Your Bookmarks ({bookmarks.length})
+          </h2>
+
+          {bookmarks.length === 0 ? (
+            <p className="text-black">No bookmarks yet.</p>
+          ) : (
+            <ul className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+              {bookmarks.map((b) => (
+                <li
+                  key={b.id}
+                  className="border rounded-lg p-4 flex justify-between items-start"
+                >
+                  <div>
+                    <a
+                      href={b.url}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="font-semibold underline text-black"
+                    >
+                      {b.title}
+                    </a>
+                    <p className="text-xs text-gray-400 mt-1">
+                      {new Date(b.created_at).toLocaleDateString()}
+                    </p>
+                  </div>
+
+                  <button
+                    onClick={() => deleteBookmark(b.id)}
+                    className="text-red-600 text-sm"
+                  >
+                    Delete
+                  </button>
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+      </main>
     </div>
   );
 }
