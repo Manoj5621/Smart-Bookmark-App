@@ -1,57 +1,21 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import Image from "next/image";
 
 export default function LoginFormContent() {
-  const [supabase, setSupabase] = useState<any>(null);
-  const [loading, setLoading] = useState(true);
-  
-  useEffect(() => {
-    // Dynamically import supabase only on client side
-    async function loadSupabase() {
-      if (typeof window === 'undefined') return;
-      
-      try {
-        const { createClient } = await import("@supabase/supabase-js");
-        const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-        const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
-        
-        if (supabaseUrl && supabaseAnonKey) {
-          const client = createClient(supabaseUrl, supabaseAnonKey);
-          setSupabase(client);
-        }
-      } catch (error) {
-        console.error('Failed to load Supabase:', error);
-      } finally {
-        setLoading(false);
-      }
-    }
-    
-    loadSupabase();
-  }, []);
-  
+  const [loading, setLoading] = useState(false);
+
   const signInWithGoogle = async () => {
-    if (!supabase) return;
+    setLoading(true);
     
-    const siteUrl =
-      process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3000";
-
-    await supabase.auth.signInWithOAuth({
-      provider: "google",
-      options: {
-        redirectTo: `${siteUrl}/dashboard`,
-      },
-    });
+    // Use a simple redirect approach that doesn't require client-side Supabase
+    // The auth will be handled server-side or via Supabase auth redirect
+    const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3000";
+    
+    // Redirect to an API route that handles the OAuth flow
+    window.location.href = `${siteUrl}/api/auth/signin?provider=google`;
   };
-
-  if (loading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-yellow-100 via-orange-50 to-red-100 dark:from-yellow-900 dark:via-orange-900 dark:to-red-900">
-        <p>Loading...</p>
-      </div>
-    );
-  }
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-yellow-100 via-orange-50 to-red-100 dark:from-yellow-900 dark:via-orange-900 dark:to-red-900 animate-gradient">
@@ -75,9 +39,10 @@ export default function LoginFormContent() {
 
         <button
           onClick={signInWithGoogle}
-          className="w-full bg-gradient-to-r from-red-500 to-red-600 hover:from-red-600 hover:to-red-700 text-white font-semibold py-3 px-6 rounded-lg shadow-lg transition-all hover:scale-105"
+          disabled={loading}
+          className="w-full bg-gradient-to-r from-red-500 to-red-600 hover:from-red-600 hover:to-red-700 text-white font-semibold py-3 px-6 rounded-lg shadow-lg transition-all hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed"
         >
-          Sign in with Google
+          {loading ? "Redirecting..." : "Sign in with Google"}
         </button>
       </div>
     </div>
