@@ -1,10 +1,6 @@
 "use client";
 
-import dynamic from 'next/dynamic';
-
-const LoginForm = dynamic(() => import('./LoginForm'), { ssr: false });
-
-export const dynamicConfig = 'force-dynamic';
+import LoginForm from './LoginForm';
 
 export default function LoginPage() {
   return <LoginForm />;

@@ -2,9 +2,7 @@
 
 import { getSupabaseClient } from "@/lib/supabase/client";
 import { useState, useEffect } from "react";
-import dynamic from "next/dynamic";
-
-const ClientOnlyImage = dynamic(() => import("next/image"), { ssr: false });
+import Image from "next/image";
 
 export default function LoginForm() {
   const [supabase, setSupabase] = useState<any>(null);
@@ -43,7 +41,7 @@ export default function LoginForm() {
     <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-yellow-100 via-orange-50 to-red-100 dark:from-yellow-900 dark:via-orange-900 dark:to-red-900 animate-gradient">
       <div className="max-w-md w-full p-6 bg-white dark:bg-gray-900 rounded-2xl shadow-xl border border-white/20">
         <div className="text-center mb-8">
-          <ClientOnlyImage
+          <Image
             src="/bookmark.png"
             alt="Bookmark Logo"
             width={80}
